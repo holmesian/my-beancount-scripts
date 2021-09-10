@@ -55,7 +55,7 @@ class WeChat(Base):
             meta['timestamp'] = str(time.timestamp()).replace('.0', '')
             account = get_account_by_guess(row['交易对方'], row['商品'], time)
             flag = "*"
-            amount_string = row['金额(元)'].replace('¥', '')
+            amount_string = row['金额(元)'].replace('¥', '').replace(',', '')
             amount = float(amount_string)
 
             if row['商户单号'] != '/':
@@ -64,46 +64,38 @@ class WeChat(Base):
             if row['备注'] != '/':
                 meta['note'] = row['备注']
 
-            meta = data.new_metadata(
-                'beancount/core/testing.beancount',
-                12345,
-                meta
-            )
-            entry = Transaction(
-                meta,
-                date(time.year, time.month, time.day),
-                '*',
-                row['交易对方'],
-                row['商品'],
-                data.EMPTY_SET,
-                data.EMPTY_SET, []
-            )
+            meta = data.new_metadata('beancount/core/testing.beancount', 12345,
+                                     meta)
+            entry = Transaction(meta, date(time.year, time.month,
+                                           time.day), '*', row['交易对方'],
+                                row['商品'], data.EMPTY_SET, data.EMPTY_SET, [])
 
             status = row['当前状态']
+            ways = row['收/支']
 
-            if status == '支付成功' or status == '朋友已收钱' or status == '已全额退款' or '已退款' in status or status == '已转账' or status == '充值成功':
+            if ways != '收入' and (status == '支付成功' or status == '朋友已收钱' or status == '已全额退款' or '已退款' in status or status == '已转账' or status == '充值成功'):
                 if '转入零钱通' in row['交易类型']:
                     entry = entry._replace(payee='')
                     entry = entry._replace(narration='转入零钱通')
-                    data.create_simple_posting(
-                        entry, Account零钱通, amount_string, 'CNY')
+                    data.create_simple_posting(entry, Account零钱通,
+                                               amount_string, 'CNY')
                 else:
                     if '微信红包' in row['交易类型']:
                         account = Account支出红包
                         if entry.narration == '/':
                             entry = entry._replace(narration=row['交易类型'])
                     else:
-                        account = get_account_by_guess(
-                            row['交易对方'], row['商品'], time)
-                    # if account == "Unknown":
-                    #	entry = replace_flag(entry, '!')
+                        account = get_account_by_guess(row['交易对方'], row['商品'],
+                                                       time)
                     if status == '已全额退款' or '已退款' in status:
                         amount_string = '-' + amount_string
-                    data.create_simple_posting(
-                        entry, account, amount_string, 'CNY')
-                data.create_simple_posting(
-                    entry, accounts[row['支付方式']], None, None)
-            elif row['当前状态'] == '已存入零钱' or row['当前状态'] == '已收钱':
+                    if account == "Expenses:Unknown":
+                        entry = replace_flag(entry, '!')
+                    data.create_simple_posting(entry, account, amount_string,
+                                               'CNY')
+                data.create_simple_posting(entry, accounts[row['支付方式']], None,
+                                           None)
+            elif status == '已存入零钱' or status == '已收钱' or status == '充值成功' or status == '已全额退款' or '已退款' in status:
                 if '微信红包' in row['交易类型']:
                     if entry.narration == '/':
                         entry = entry._replace(narration=row['交易类型'])
@@ -111,17 +103,20 @@ class WeChat(Base):
                 else:
                     income = get_income_account_by_guess(
                         row['交易对方'], row['商品'], time)
+                    if status == '已全额退款' or '已退款' in status:
+                        amount_string = '-' + amount_string
                     if income == 'Income:Unknown':
                         entry = replace_flag(entry, '!')
                     data.create_simple_posting(entry, income, None, 'CNY')
-                data.create_simple_posting(
-                    entry, Account余额, amount_string, 'CNY')
+                data.create_simple_posting(entry, Account余额, amount_string,
+                                           'CNY')
             else:
                 print('Unknown row', row)
 
-            #b = printer.format_entry(entry)
+            # b = printer.format_entry(entry)
             # print(b)
-            if not self.deduplicate.find_duplicate(entry, amount, 'wechat_trade_no'):
+            if not self.deduplicate.find_duplicate(entry, amount,
+                                                   'wechat_trade_no'):
                 transactions.append(entry)
 
         self.deduplicate.apply_beans()

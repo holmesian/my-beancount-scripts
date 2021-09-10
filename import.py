@@ -10,6 +10,7 @@ from modules.imports.alipay import Alipay
 #from modules.imports.ccb_debit import CCBDebit
 from modules.imports.citic_credit import CITICCredit
 from modules.imports.cmb_credit import CMBCredit
+from modules.imports.cmb_debit import CMBDebit
 from modules.imports.cmbc_credit import CMBCCredit
 from modules.imports.icbc_credit import ICBCCredit
 from modules.imports.icbc_debit import ICBCDebit
@@ -19,15 +20,18 @@ from modules.imports.alipay_prove import AlipayProve
 
 parser = argparse.ArgumentParser("import")
 parser.add_argument("path", help="CSV Path")
-parser.add_argument(
-    "--entry", help="Entry bean path (default = main.bean)", default='main.bean')
+parser.add_argument("--entry",
+                    help="Entry bean path (default = main.bean)",
+                    default='main.bean')
 parser.add_argument("--out", help="Output bean path", default='out.bean')
 args = parser.parse_args()
 
 entries, errors, option_map = loader.load_file(args.entry)
 
-importers = [Alipay, AlipayProve, WeChat, CITICCredit, CMBCCredit,
-             CMBCredit, YuEBao, ICBCCredit, ICBCDebit]#, CCBDebit]
+importers = [
+    Alipay, AlipayProve, WeChat, CITICCredit, CMBCCredit, CMBDebit,
+    CMBCredit, YuEBao, ICBCCredit, ICBCDebit
+]  #, CCBDebit]
 instance = None
 for importer in importers:
     try:
@@ -45,7 +49,6 @@ if instance == None:
 
 new_entries = instance.parse()
 
-
 with open(args.out, 'w', encoding='utf-8') as f:
     printer.print_entries(new_entries, file=f)
 
@@ -59,7 +62,6 @@ file = parser.parse_one('''
 
 ''')
 print(file.postings)
-
 
 file.postings[0] = file.postings[0]._replace(
     units=file.postings[0].units._replace(number=100))
